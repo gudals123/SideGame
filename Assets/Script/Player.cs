@@ -4,10 +4,9 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-public class Palyer : MonoBehaviour
+public class Player : Entity
 {
-    private Rigidbody2D rb;
-    public Animator anim;
+    
 
 
     [SerializeField]
@@ -30,26 +29,28 @@ public class Palyer : MonoBehaviour
 
     private float dashCooldownTimer;
 
-    [Header("Collision info")]
+    [Header("Attack info")]
     [SerializeField]
-    private float groundCheckDistance;
-    [SerializeField]
-    private LayerMask whatIsGround;
-    private bool isGrounded;
+    private float comboTime  = 0.3f;
+    private float comboTimeWindow;
+    private bool isAttacking;
+    private int comboCounter;
 
     private float xInput;
 
-    private int facingDir = 1;
-    private bool facingRight = true;
 
 
-    void Start()
+    protected override void Start()
     {
-        rb = GetComponent<Rigidbody2D>();
+      base.Start();
     }
 
-    void Update()
+    protected override void Update()
     {
+        base.Update();
+
+
+
         Movement();
 
         CheckInput();
@@ -59,7 +60,7 @@ public class Palyer : MonoBehaviour
 
         dashTime -=Time.deltaTime;
         dashCooldownTimer -= Time.deltaTime;
-
+        comboTimeWindow -= Time.deltaTime;
 
 
 
@@ -68,16 +69,31 @@ public class Palyer : MonoBehaviour
         AnimatorControllers();
     }
 
-    private void CollisionChecks()
+    public void AttackOver()
     {
-        isGrounded = Physics2D.Raycast(transform.position, Vector2.down, groundCheckDistance, whatIsGround);
+        isAttacking = false;
+
+        comboCounter++;
+
+        if(comboCounter > 2 )
+            comboCounter = 0;
+
+
     }
+
+
+
 
     private void CheckInput()
     {
         xInput = Input.GetAxisRaw("Horizontal");
 
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (Input.GetKeyDown(KeyCode.X))
+        {
+            StartAttackEvent();
+        }
+
+        if (Input.GetKeyDown(KeyCode.C))
         {
             Jump();
         }
@@ -88,17 +104,38 @@ public class Palyer : MonoBehaviour
         }
     }
 
+    private void StartAttackEvent()
+    {
+        if (comboTimeWindow < 0)
+            comboCounter = 0;
+
+        if(isGrounded)
+        {
+            isAttacking = true;
+            comboTimeWindow = comboTime;
+        }
+
+    }
+
     private void DashAbility()
     {
-        dashCooldownTimer = dashCooldown;
-        dashTime = dashDuration;
+        if(dashCooldownTimer < 0 && !isAttacking)
+        {
+            dashCooldownTimer = dashCooldown;
+            dashTime = dashDuration;
+        }
     }
 
     private void Movement()
     {
-        if(dashTime > 0)
+
+        if(isAttacking && isGrounded)
         {
-            rb.velocity = new Vector2(xInput * dashSpeed, 0);
+            rb.velocity = new Vector2(0,0);
+        }
+        else if(dashTime > 0)
+        {
+            rb.velocity = new Vector2(facingDir * dashSpeed, 0);
         }
         else
         {
@@ -117,20 +154,16 @@ public class Palyer : MonoBehaviour
     private void AnimatorControllers()
     {
         bool isMoving = rb.velocity.x != 0;
+        anim.SetFloat("yVelocity", rb.velocity.y);
 
         anim.SetBool("isMoving",isMoving);
         anim.SetBool("isDashing", dashTime > 0);
-        anim.SetFloat("yVelocity", rb.velocity.y);
         anim.SetBool("isGrounded", isGrounded);
-
+        anim.SetBool("isAttacking", isAttacking);
+        anim.SetInteger("comboCounter",comboCounter);
     }
 
-    private void Flip()
-    {
-        facingDir = facingDir * -1;
-        facingRight = !facingRight;
-        transform.Rotate(0, 180, 0);
-    }
+
 
 
     private void FlipController()
@@ -144,9 +177,6 @@ public class Palyer : MonoBehaviour
             Flip();
         }
     }
-    private void OnDrawGizmos()
-    {
-        Gizmos.DrawLine(transform.position, new Vector3(transform.position.x,transform.position.y - groundCheckDistance));
-    }
+
 
 }
